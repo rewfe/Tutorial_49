@@ -1,15 +1,15 @@
 //
-//  Tutorial_49Tests.swift
-//  Tutorial_49Tests
+//  CloudDemoTests.swift
+//  CloudDemoTests
 //
-//  Created by Admin on 01.08.15.
-//  Copyright (c) 2015 Admin. All rights reserved.
+//  Created by Gabriel Theodoropoulos on 9/4/15.
+//  Copyright (c) 2015 Appcoda. All rights reserved.
 //
 
 import UIKit
 import XCTest
 
-class Tutorial_49Tests: XCTestCase {
+class CloudDemoTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
