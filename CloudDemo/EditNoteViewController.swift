@@ -10,6 +10,10 @@ import UIKit
 import QuartzCore
 import CloudKit
 
+protocol EditNoteViewControllerDelegate {
+    func didSaveNote(noteRecord: CKRecord, wasEditingNote: Bool)
+}
+
 
 class EditNoteViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate
 {
@@ -27,9 +31,12 @@ class EditNoteViewController: UIViewController, UIImagePickerControllerDelegate,
     @IBOutlet weak var viewWait: UIView!
     
     var imageURL: NSURL!
+    var editedNoteRecord: CKRecord!
     
     let documentsDirectoryPath = NSSearchPathForDirectoriesInDomains(.DocumentDirectory, .UserDomainMask, true)[0] as! NSString
     let tempImageName = "temp_image.jpg"
+    
+    var delegate: EditNoteViewControllerDelegate!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -43,6 +50,19 @@ class EditNoteViewController: UIViewController, UIImagePickerControllerDelegate,
         let swipeDownGestureRecognizer = UISwipeGestureRecognizer(target: self, action: "handleSwipeDownGestureRecognizer:")
         swipeDownGestureRecognizer.direction = UISwipeGestureRecognizerDirection.Down
         view.addGestureRecognizer(swipeDownGestureRecognizer)
+        if let editedNote = editedNoteRecord {
+            txtNoteTitle.text = editedNote.valueForKey("noteTitle") as! String
+            textView.text = editedNote.valueForKey("noteText") as! String
+            let imageAsset: CKAsset = editedNote.valueForKey("noteImage") as! CKAsset
+            imageView.image = UIImage(contentsOfFile: imageAsset.fileURL.path!)
+            imageView.contentMode = UIViewContentMode.ScaleAspectFit
+            
+            imageURL = imageAsset.fileURL
+            
+            imageView.hidden = false
+            btnRemoveImage.hidden = false
+            btnSelectPhoto.hidden = true
+        }
     }
 
     
@@ -124,6 +144,62 @@ class EditNoteViewController: UIViewController, UIImagePickerControllerDelegate,
     
     
     @IBAction func saveNote(sender: AnyObject) {
+        if txtNoteTitle.text == "" || textView.text == "" {
+            return
+        }
+        
+        viewWait.hidden = false
+        view.bringSubviewToFront(viewWait)
+        navigationController?.setNavigationBarHidden(true, animated: true)
+        
+        var noteRecord: CKRecord!
+        var isEditingNote: Bool!
+        
+        if let editedNote = editedNoteRecord {
+            noteRecord = editedNote
+            isEditingNote = true
+        }
+        else {
+            let timestampAsString = String(format: "%f", NSDate.timeIntervalSinceReferenceDate())
+            let timestampParts = timestampAsString.componentsSeparatedByString(".")
+            let noteID = CKRecordID(recordName: timestampParts[0])
+            
+            noteRecord = CKRecord(recordType: "Notes", recordID: noteID)
+            
+            isEditingNote = false
+        }
+        
+        noteRecord.setObject(txtNoteTitle.text, forKey: "noteTitle")
+        noteRecord.setObject(textView.text, forKey: "noteText")
+        noteRecord.setObject(NSDate(), forKey: "noteEditedDate")
+        
+        if let url = imageURL {
+            let imageAsset = CKAsset(fileURL: url)
+            noteRecord.setObject(imageAsset, forKey: "noteImage")
+        }
+        else {
+            let fileURL = NSBundle.mainBundle().URLForResource("no_image", withExtension: "png")
+            let imageAsset = CKAsset(fileURL: fileURL)
+            noteRecord.setObject(imageAsset, forKey: "noteImage")
+        }
+        
+        let container = CKContainer.defaultContainer()
+        let privateDatabase = container.privateCloudDatabase
+        
+        privateDatabase.saveRecord(noteRecord, completionHandler: { (record, error) -> Void in
+            if (error != nil) {
+                println(error)
+            }
+            else {
+                self.delegate.didSaveNote(noteRecord, wasEditingNote: isEditingNote)
+            }
+            
+            NSOperationQueue.mainQueue().addOperationWithBlock({ () -> Void in
+                self.viewWait.hidden = true
+                self.navigationController?.setNavigationBarHidden(false, animated: true)
+            })
+        })
+
     
     }
     
